@@ -640,11 +640,49 @@ class compareDatastreamChecksumResponse(apimResponse):
 class getDatastreamRequest(apimRequest):
   def __init__(self, **kw):
     apimRequest.__init__(self,**kw)
+    self.soapaction="http://www.fedora.info/definitions/1/0/api/#getDatastream"
+    if "pid" in kw:
+      self.pid = kw["pid"]
+    else:
+      self.pid = None
+    if "asOfDateTime" in kw:
+      self.asOfDateTime = kw["asOfDateTime"]
+    else:
+      self.asOfDateTime = None
+    if "dsID" in kw:
+      self.dsID = kw["dsID"]
+    else:
+      self.dsID = None
+  def soapBody(self):
+     op = self.document.createElementNS(NS_APIM,"getDatastream")
+     op.appendChild(self.stringPart("pid",self.pid)) 
+     op.appendChild(self.stringPart("asOfDateTime",self.asOfDateTime)) 
+     op.appendChild(self.stringPart("dsID",self.dsID))
+     return op
 
 class getDatastreamResponse(apimResponse):
   def __init__(self, **kw):
     apimResponse.__init__(self,**kw)
     self.datastream = None
+  def start_element(self,name,attrs):
+    if name == 'datastream':
+      self.buffering = True
+      self.propsBuffer = {}
+    else:
+      if self.buffering:
+        self.buffer = ''
+  def end_element(self,name):
+    if name == 'datastream':
+      self.datastream = complexHolder(self.propsBuffer)
+      self.buffering = False
+      self.propsBuffer = None
+    else:
+      if self.buffering:
+        self.propsBuffer[name] = self.buffer
+        self.buffer = None
+  def char_data(self,data):
+    if (self.buffer != None):
+      self.buffer += data
 
 class getDatastreamsRequest(apimRequest):
   def __init__(self, **kw):
@@ -655,13 +693,13 @@ class getDatastreamsRequest(apimRequest):
     else:
       self.pid = None
     if "asOfDateTime" in kw:
-      self.pid = kw["asOfDateTime"]
+      self.asOfDateTime = kw["asOfDateTime"]
     else:
       self.asOfDateTime = None
     if "dsState" in kw:
-      self.pid = kw["dsState"]
+      self.dsState = kw["dsState"]
     else:
-      self.asOfDateTime = 'A'
+      self.dsState = 'A'
   def soapBody(self):
      op = self.document.createElementNS(NS_APIM,"getDatastreams")
      op.appendChild(self.stringPart("pid",self.pid)) 
@@ -698,10 +736,24 @@ class getDatastreamsResponse(apimResponse):
 class getDatastreamHistoryRequest(apimRequest):
   def __init__(self, **kw):
     apimRequest.__init__(self,**kw)
+    self.soapaction="http://www.fedora.info/definitions/1/0/api/#getDatastreamHistory"
+    if "pid" in kw:
+      self.pid = kw["pid"]
+    else:
+      self.pid = None
+    if "dsID" in kw:
+      self.dsID = kw["dsID"]
+    else:
+      self.dsID = None
+  def soapBody(self):
+     op = self.document.createElementNS(NS_APIM,"getDatastreamHistory")
+     op.appendChild(self.stringPart("pid",self.pid)) 
+     op.appendChild(self.stringPart("dsID",self.dsID))
+     return op
 
-class getDatastreamHistoryResponse(apimResponse):
+class getDatastreamHistoryResponse(getDatastreamsResponse):
   def __init__(self, **kw):
-    apimResponse.__init__(self,**kw)
+    getDatastreamsResponse.__init__(self,**kw)
 
 class purgeDatastreamRequest(apimRequest):
   def __init__(self, **kw):
