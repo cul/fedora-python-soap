@@ -15,32 +15,33 @@ def testUri(test):
   return str(test).startswith('info:fedora/') or urlparse(test)[0] in ['http','https','file']
 
 class FedoraServices(object):
-  def __init__(self,debug=False):
+  def __init__(self,hostname='localhost',port=8080,debug=False):
     self.map = dict()
     self.locator = ServiceLocator()
-    if debug:
-      self.apim = self.locator.getDebug()
-      self.apia = self.locator.getAPIA()
-    else:
-      self.apim = self.locator.getAPIM(host='localhost',port='8443',SSL=True,debug=True)
-      self.apia = self.locator.getAPIA(debug=True)
+    self.apim = self.locator.getAPIM(host=hostname,port='8443',SSL=True,debug=debug)
+    self.apia = self.locator.getAPIA(host=hostname,port=port,debug=debug)
   def setBasicAuth(self, username, password):
     self.apim.binding.setAuth(username=username, password=password)
     self.apia.binding.setAuth(username=username, password=password)
-  def setSSL(self, useSSL):
-    self.apim.binding.setSSL(useSSL)
+  def setSSL(self, apim,apia=False):
+    self.apim.binding.setSSL(apim)
+    self.apia.binding.setSSL(apia)
 
-  def getRelationships(subject=subject, predicate=predicate):
+  def getDatastreamContent(self, pid, dsId):
+    path = "/fedora/objects/%s/datastreams/%s/content" % (pid, dsId)
+    return self.apim.binding.fetch(path).read()
+
+  def getRelationships(self, subject, predicate):
     request = getRelationshipsRequest(subject=subject, relationship=predicate)
     response = self.apim.getRelationships(request)
     return response
 
-  def addRelationship(subject=subject, predicate=predicate, object=object):
+  def addRelationship(self, subject, predicate, object):
     request = addRelationshipRequest(subject=subject, relationship=predicate, object=object, isLiteral=testUri(object))
     response = self.apim.addRelationship(request)
     return response
 
-  def purgeRelationship(subject=subject, predicate=predicate, object=object):
+  def purgeRelationship(self, subject, predicate, object):
     request = purgeRelationshipRequest(subject=subject, relationship=predicate, object=object, isLiteral=testUri(object))
     response = self.apim.purgeRelationship(request)
     return response
@@ -49,15 +50,16 @@ class FedoraServices(object):
     return self.map[identifiers[0].strip()]
 
   def getChecksumInfo(self, dsLocation):
-    if dsLocation.startswith('file://'):
-      path = dsLocation.replace('file://','')
-      md5Path = path + '.md5'
-      if os.access(md5Path, os.R_OK):
-        checksum = None
-        csType = 'MD5'
-        with open(md5Path) as f:
-          checksum = f.read().strip()
-        return (csType,checksum)
+    if dsLocation != None:
+      if dsLocation.startswith('file://'):
+        path = dsLocation.replace('file://','')
+        md5Path = path + '.md5'
+        if os.access(md5Path, os.R_OK):
+          checksum = None
+          csType = 'MD5'
+          with open(md5Path) as f:
+            checksum = f.read().strip()
+          return (csType,checksum)
     return (None, None)
 
   def addDatastream(self, objuri, properties):
@@ -66,6 +68,7 @@ class FedoraServices(object):
     split = objuri.split('/')
     pid = split[-1]
     request = listDatastreamsRequest(pid=pid)
+    print request.serialize()
     response = self.apia.listDatastreams(request)
     found = False
     for datastream in response.datastreamDef:
@@ -85,6 +88,7 @@ class FedoraServices(object):
                      controlGroup=properties["controlGroup"],
                      dsState=properties["dsState"],
                      formatURI=properties["formatURI"],
+                     versionable=properties["versionable"],
                      checksumType=csType,checksum=cs,
                      MIMEType=properties["MIMEType"])
     try:

@@ -9,11 +9,19 @@ NS_APIM = "http://www.fedora.info/definitions/1/0/api/"
 DEFAULT_CHECKSUM_TYPE = ''
 
 class complexHolder:
-  def __init__(self,properties):
+  def __init__(self,properties, flatten=False):
     self.properties = properties
+    self.flatten = flatten
   def __getattr__(self, name):
     if name in self.properties:
-      return self.properties[name]
+      if self.flatten:
+        _val = self.properties[name]
+        if isinstance(_val, list) and len(_val) == 1:
+          return _val[0]
+        else:
+          return _val
+      else:
+        return self.properties[name]
     else:
       raise AttributeError(name)
 
@@ -384,7 +392,10 @@ class addDatastreamRequest(apimRequest):
     else:
       self.dsLabel = None
     if ("versionable" in kw):
-      self.versionable = bool(kw["versionable"])
+      if kw["versionable"] == None:
+        self.versionable = True
+      else:
+        self.versionable = bool(kw["versionable"])
     else:
       self.versionable = True
     if ("MIMEType" in kw):
@@ -805,9 +816,9 @@ class getRelationshipsRequest(apimRequest):
     apimRequest.__init__(self,**kw)
     self.soapaction="http://www.fedora.info/definitions/1/0/api/#getRelationships"
     if ("subject" in kw):
-      self.pid = kw["subject"]
+      self.subject = kw["subject"]
     else:
-      self.pid = None
+      self.subject = None
     if ("relationship" in kw):
       self.relationship = kw["relationship"]
     else:
@@ -815,7 +826,9 @@ class getRelationshipsRequest(apimRequest):
   def soapBody(self):
     op = self.document.createElementNS(NS_APIM,"getRelationships")
     op.appendChild(self.stringPart("subject",str(self.subject)))
-    op.appendChild(self.stringPart("relationship",self.relationship))
+    rpart = op.appendChild(self.stringPart("relationship",self.relationship))
+    if self.relationship == None:
+      self.nillify(rpart)
     return op
 
 class getRelationshipsResponse(apimResponse):
@@ -834,7 +847,7 @@ class getRelationshipsResponse(apimResponse):
         self.buffer = ''
   def end_element(self,name):
     if name == 'relationships':
-      self.resultList.append(complexHolder(self.propsBuffer))
+      self.relationships.append(complexHolder(self.propsBuffer, True))
       self.buffering = False
       self.propsBuffer = None
     else:

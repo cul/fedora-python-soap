@@ -11,7 +11,7 @@ class ServiceLocator:
   def getAPIA(self, host=None, path=APIA_PATH, **kw):
       return APIAClient(host or ServiceLocator.default_host, path=path, **kw)
   def getAPIM(self, host=None, path=APIM_PATH, **kw):
-      return APIMClient(host=ServiceLocator.default_host, path=path, **kw)
+      return APIMClient(host or ServiceLocator.default_host, path=path, **kw)
   def getDebug(self, host=None, path=None, **kw):
       return DebugProxy(host=ServiceLocator.default_host, path=path, **kw)
 
@@ -35,6 +35,25 @@ class Binding:
     self.useSSL=value
   def setAuth(self,username,password):
     self.creds = base64.b64encode(username + ':' + password)
+  def fetch(self, path):
+    if (self.useSSL):
+      connection = httplib.HTTPSConnection(self.host,self.port)
+    else:
+      connection = httplib.HTTPConnection(self.host,self.port)
+
+    creds = getattr(self,'creds',None)
+    myheaders = {}
+    if creds:
+      myheaders['Authorization'] = 'Basic ' + creds
+    try:
+      connection.request ('GET', path, None,headers=myheaders)
+    except:
+      print "Connection failed:"
+      print "host: %s" % self.host
+      print "port: %s" % self.port
+      print "path: %s" % self.path
+      return None
+    return connection.getresponse()
   def send(self,request):
     """Handles making the SOAP request"""
     if (self.useSSL):
@@ -57,7 +76,14 @@ class Binding:
         print input.encode('utf-8')
       except:
         pass
-    connection.request ('POST', self.path, body=input,headers=myheaders)
+    try:
+      connection.request ('POST', self.path, body=input,headers=myheaders)
+    except:
+      print "Connection failed:"
+      print "host: %s" % self.host
+      print "port: %s" % self.port
+      print "path: %s" % self.path
+      exit
     response = connection.getresponse()
     self.responsedata = response.read()
     self.status = response.status
